@@ -1,1 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OMNIA Chatbot</title>
+  <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+</head>
+<body>
+  <h1 style="text-align:center; font-family:sans-serif; margin-top: 50px;">
+    Welcome to OMNIA’s AI Chatbot 👩‍💼
+  </h1>
 
+  <div class="n8n-chat"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/index.global.js"></script>
+  <script>
+    createChat({
+      webhookUrl: 'https://n8nsimon.app.n8n.cloud/webhook/ffcf29b6-19e9-40fd-81a6-132910560043/chat'
+    });
+  </script>
+</body>
+</html>
