@@ -1,0 +1,294 @@
+{
+  "name": "Icebreaker Lead Outreach",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "parameters": {
+        "updateTypes": [
+          "message"
+        ]
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [200, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram Account"
+        }
+      },
+      "id": "00000000-0000-0000-0000-000000000002"
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $node[\"Telegram Trigger\"].json.message.text;\nconst nameMatch = text.match(/\\/send icebreaker to (.+)/i);\nconst countMatch = text.match(/\\/send (\\d+) icebreakers?/i);\nif (nameMatch) {\n  return [{ json: { mode: 'single', name: nameMatch[1] } }];\n} else if (countMatch) {\n  return [{ json: { mode: 'batch', count: parseInt(countMatch[1], 10) } }];\n} else {\n  return [{ json: { mode: 'unknown' } }];\n}"
+      },
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [400, 0],
+      "id": "00000000-0000-0000-0000-000000000003"
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "sheetId": "=SheetID",
+        "range": "A:Z",
+        "lookupColumn": "Full Name",
+        "lookupValue": "={{ $json[\"name\"] }}",
+        "returnAllMatches": false
+      },
+      "name": "Google Sheets Lookup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [600, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets"
+        }
+      },
+      "id": "00000000-0000-0000-0000-000000000004"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json[\"WebsiteURL\"] }}",
+        "options": {}
+      },
+      "name": "Get Homepage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [800, 0],
+      "id": "00000000-0000-0000-0000-000000000005"
+    },
+    {
+      "parameters": {
+        "cssSelector": "a",
+        "returnValue": "attribute",
+        "attribute": "href",
+        "returnArray": true
+      },
+      "name": "Extract Links",
+      "type": "n8n-nodes-base.htmlExtract",
+      "typeVersion": 1,
+      "position": [1000, 0],
+      "id": "00000000-0000-0000-0000-000000000006"
+    },
+    {
+      "parameters": {
+        "functionCode": "const links = items[0].json[\"Extract Links\"];\nconst filtered = links.filter(l => l.startsWith('/') );\nconst unique = [...new Set(filtered)];\nconst limited = unique.slice(0,4).map(l => $json[\"WebsiteURL\"] + l);\nreturn limited.map(url => ({json: {url}}));"
+      },
+      "name": "Prepare Subpages",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1200, 0],
+      "id": "00000000-0000-0000-0000-000000000007"
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [1400, 0],
+      "id": "00000000-0000-0000-0000-000000000008"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "fullResponse": true
+        }
+      },
+      "name": "Fetch Subpage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1600, 0],
+      "id": "00000000-0000-0000-0000-000000000009"
+    },
+    {
+      "parameters": {
+        "onError": "continue"
+      },
+      "name": "Continue On Error",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1600, -80],
+      "id": "00000000-0000-0000-0000-00000000001a"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "HTML to Markdown",
+      "type": "n8n-nodes-base.htmlToMarkdown",
+      "typeVersion": 1,
+      "position": [1800, 0],
+      "id": "00000000-0000-0000-0000-00000000000a"
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You're a helpful AI. Summarize this page in two paragraphs."
+          },
+          {
+            "role": "user",
+            "content": "={{ $json }}"
+          }
+        ],
+        "responsePropertyName": "abstract"
+      },
+      "name": "Summarize Page",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [2000, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAI"
+        }
+      },
+      "id": "00000000-0000-0000-0000-00000000000b"
+    },
+    {
+      "parameters": {
+        "mode": "multiplex"
+      },
+      "name": "Aggregate Summaries",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [2200, 0],
+      "id": "00000000-0000-0000-0000-00000000000c"
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a Spartan sounding assistant. Write a short personalized icebreaker email based on the following summary."
+          },
+          {
+            "role": "user",
+            "content": "={{ $json.abstract }}"
+          }
+        ],
+        "responsePropertyName": "email"
+      },
+      "name": "Generate Email",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [2400, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAI"
+        }
+      },
+      "id": "00000000-0000-0000-0000-00000000000d"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "fromEmail": "you@example.com",
+        "toEmail": "={{ $node[\"Google Sheets Lookup\"].json.Email }}",
+        "subject": "=Quick question for {{$node[\"Google Sheets Lookup\"].json[\"Full Name\"]}}",
+        "message": "={{ $json.email }}"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [2600, 0],
+      "credentials": {
+        "gmailOAuth2Api": {
+          "id": "1",
+          "name": "Gmail"
+        }
+      },
+      "id": "00000000-0000-0000-0000-00000000000e"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "sheetId": "=SheetID",
+        "key": "={{ $node[\"Google Sheets Lookup\"].json.rowIndex }}",
+        "additionalFields": {
+          "Last Icebreaker": "={{ $json.email }}",
+          "Last Contacted": "={{ $today }}"
+        }
+      },
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [2800, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets"
+        }
+      },
+      "id": "00000000-0000-0000-0000-00000000000f"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"Telegram Trigger\"].json.message.chat.id }}",
+        "text": "=✅ Sent icebreaker to {{$node[\"Google Sheets Lookup\"].json[\"Full Name\"]}}"
+      },
+      "name": "Notify",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [3000, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram Account"
+        }
+      },
+      "id": "00000000-0000-0000-0000-000000000010"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Telegram Trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": { "main": [ [ { "node": "Parse Command", "type": "main", "index": 0 } ] ] },
+    "Parse Command": { "main": [ [ { "node": "Google Sheets Lookup", "type": "main", "index": 0 } ] ] },
+    "Google Sheets Lookup": { "main": [ [ { "node": "Get Homepage", "type": "main", "index": 0 } ] ] },
+    "Get Homepage": { "main": [ [ { "node": "Extract Links", "type": "main", "index": 0 } ] ] },
+    "Extract Links": { "main": [ [ { "node": "Prepare Subpages", "type": "main", "index": 0 } ] ] },
+    "Prepare Subpages": { "main": [ [ { "node": "Split In Batches", "type": "main", "index": 0 } ] ] },
+    "Split In Batches": { "main": [ [ { "node": "Fetch Subpage", "type": "main", "index": 0 } ] ] },
+    "Fetch Subpage": { "main": [ [ { "node": "HTML to Markdown", "type": "main", "index": 0 } ] ] },
+    "HTML to Markdown": { "main": [ [ { "node": "Summarize Page", "type": "main", "index": 0 } ] ] },
+    "Summarize Page": { "main": [ [ { "node": "Aggregate Summaries", "type": "main", "index": 0 } ] ] },
+    "Aggregate Summaries": { "main": [ [ { "node": "Generate Email", "type": "main", "index": 0 } ] ] },
+    "Generate Email": { "main": [ [ { "node": "Send Email", "type": "main", "index": 0 } ] ] },
+    "Send Email": { "main": [ [ { "node": "Update Sheet", "type": "main", "index": 0 } ] ] },
+    "Update Sheet": { "main": [ [ { "node": "Notify", "type": "main", "index": 0 } ] ] }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null,
+  "id": "1000"
+}
